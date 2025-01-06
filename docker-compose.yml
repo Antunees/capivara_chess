@@ -1,0 +1,124 @@
+services:
+  games_pool:
+    build:
+      context: ./games_pool
+      dockerfile: Dockerfile
+    container_name: games_pool
+    restart: always
+    ports:
+      - "9000:9000"
+    volumes:
+      - ./games_pool:/app
+    environment:
+      - PYTHONUNBUFFERED=1
+
+  broker:
+    image: redis
+    restart: always
+    ports:
+      - 6000:6000
+    command: redis-server --requirepass a89s7d789asd789asd879789asd --bind 0.0.0.0 --port 6000 --databases 1
+    healthcheck:
+      test: [ "CMD", "redis-cli", "-p", "6000", "--raw", "incr", "ping" ]
+
+  game_results_prestart:
+    build:
+      context: ./games_results
+      dockerfile: Dockerfile
+    networks:
+      - default
+    depends_on:
+      games_results_database:
+        condition: service_healthy
+      broker:
+        condition: service_healthy
+    command: bash scripts/prestart.sh
+    env_file:
+      - .env
+    environment:
+      - ENVIRONMENT=${ENVIRONMENT}
+      - BACKEND_CORS_ORIGINS=${BACKEND_CORS_ORIGINS}
+      - POSTGRES_SERVER=${POSTGRES_SERVER}
+      - POSTGRES_PORT=${POSTGRES_PORT}
+      - POSTGRES_DB=${POSTGRES_DB}
+      - POSTGRES_USER=${POSTGRES_USER?Variable not set}
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD?Variable not set}
+
+  game_results-rebase:
+    build:
+      context: ./games_results
+      dockerfile: Dockerfile
+    networks:
+      - default
+    depends_on:
+      games_results_database:
+        condition: service_healthy
+      broker:
+        condition: service_healthy
+      game_results_prestart:
+        condition: service_completed_successfully
+    command: bash scripts/rebase.sh
+    env_file:
+      - .env
+    environment:
+      - ENVIRONMENT=${ENVIRONMENT}
+      - BACKEND_CORS_ORIGINS=${BACKEND_CORS_ORIGINS}
+      - POSTGRES_SERVER=${POSTGRES_SERVER}
+      - POSTGRES_PORT=${POSTGRES_PORT}
+      - POSTGRES_DB=${POSTGRES_DB}
+      - POSTGRES_USER=${POSTGRES_USER?Variable not set}
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD?Variable not set}
+
+  games_results:
+    build:
+      context: ./games_results
+      dockerfile: Dockerfile
+    restart: always
+    networks:
+      - default
+    volumes:
+      - ./games_results/app:/app/app
+    ports:
+      - 9001:9001
+    depends_on:
+      games_results_database:
+        condition: service_healthy
+      broker:
+        condition: service_healthy
+      game_results_prestart:
+        condition: service_completed_successfully
+      game_results-rebase:
+        condition: service_completed_successfully
+    env_file:
+      - .env
+    environment:
+      - ENVIRONMENT=${ENVIRONMENT}
+      - BACKEND_CORS_ORIGINS=${BACKEND_CORS_ORIGINS}
+      - POSTGRES_SERVER=${POSTGRES_SERVER}
+      - POSTGRES_PORT=${POSTGRES_PORT}
+      - POSTGRES_DB=${POSTGRES_DB}
+      - POSTGRES_USER=${POSTGRES_USER?Variable not set}
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD?Variable not set}
+
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:9001/api/v1/utils/health-check/"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  games_results_database:
+    env_file:
+      - .env
+    image: postgres:13
+    restart: always
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}"]
+      interval: 10s
+      retries: 5
+      start_period: 30s
+      timeout: 10s
+    environment:
+      - PGDATA=/var/lib/postgresql/data/pgdata
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD?Variable not set}
+      - POSTGRES_USER=${POSTGRES_USER?Variable not set}
+      - POSTGRES_DB=${POSTGRES_DB?Variable not set}

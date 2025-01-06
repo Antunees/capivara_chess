@@ -1,0 +1,21 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Imagem Atualizada</title>
+    <script>
+        function reloadImage() {
+            const image = document.getElementById('dynamicImage');
+            const timestamp = new Date().getTime(); // Adiciona um timestamp para evitar cache
+            image.src = `http://192.168.0.127:9000/board_image/11?${timestamp}`;
+        }
+
+        setInterval(reloadImage, 1000); // Recarrega a cada 1000ms (1 segundo)
+    </script>
+</head>
+<body style="background-color: black;">
+    <h1>Imagem Atualizada</h1>
+    <img id="dynamicImage" src="http://192.168.0.127:9000/board_image/11" alt="Imagem do Board" style="max-width: 100%; height: auto;">
+</body>
+</html>
