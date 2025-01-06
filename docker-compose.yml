@@ -23,7 +23,7 @@ services:
 
   game_results_prestart:
     build:
-      context: ./games_results
+      context: ./capivara_chess_results
       dockerfile: Dockerfile
     networks:
       - default
@@ -46,7 +46,7 @@ services:
 
   game_results-rebase:
     build:
-      context: ./games_results
+      context: ./capivara_chess_results
       dockerfile: Dockerfile
     networks:
       - default
@@ -71,13 +71,13 @@ services:
 
   games_results:
     build:
-      context: ./games_results
+      context: ./capivara_chess_results
       dockerfile: Dockerfile
     restart: always
     networks:
       - default
     volumes:
-      - ./games_results/app:/app/app
+      - ./capivara_chess_results/app:/app/app
     ports:
       - 9001:9001
     depends_on:
