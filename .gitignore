@@ -1,3 +1,7 @@
 capivara_chess_results
 bot
 .env
+./Lib
+./Scripts
+./Include
+__pycache__
