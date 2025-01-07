@@ -1,5 +1,7 @@
 services:
   games_pool:
+    env_file:
+      - .env
     build:
       context: ./games_pool
       dockerfile: Dockerfile
@@ -9,6 +11,21 @@ services:
       - "9000:9000"
     volumes:
       - ./games_pool:/app
+    environment:
+      - PYTHONUNBUFFERED=1
+
+  games_lobby:
+    env_file:
+      - .env
+    build:
+      context: ./games_lobby
+      dockerfile: Dockerfile
+    container_name: games_lobby
+    restart: always
+    ports:
+      - "9002:9002"
+    volumes:
+      - ./games_lobby:/app
     environment:
       - PYTHONUNBUFFERED=1
 

@@ -1,5 +1,7 @@
+import jwt
 import logging
-from fastapi import FastAPI, HTTPException
+import os
+from fastapi import FastAPI, Response, status, HTTPException
 from pydantic import BaseModel
 import chess
 from fastapi.responses import Response
@@ -7,6 +9,7 @@ import cairosvg
 import chess.svg
 from datetime import datetime
 
+SECRET_KEY = os.getenv("SECRET_KEY")
 app = FastAPI()
 
 games = {}
@@ -74,11 +77,27 @@ class Move(BaseModel):
     move: str
 
 
-@app.post("/create_game")
-def create_game(game_id: str, white_id: str, black_id: str):
+@app.post("/create_game", status_code=201)
+def create_game(token: str, response: Response):
     """Cria uma nova partida de xadrez."""
-    games[game_id] = ChessGame(white_id, black_id)
-    return {"game_id": game_id, "message": "Nova partida criada com sucesso."}
+    token1 = jwt.decode(
+        token,
+        SECRET_KEY,
+        algorithms=["HS256"],
+    )
+
+    if not games.get(token1['game_id']):
+        games[token1['game_id']] = ChessGame(token1['players'][0], token1['players'][1])
+        return
+
+    response.status_code = status.HTTP_200_OK
+
+
+# @app.post("/create_game")
+# def create_game(game_id: str, white_id: str, black_id: str):
+#     """Cria uma nova partida de xadrez."""
+#     games[game_id] = ChessGame(white_id, black_id)
+#     return {"game_id": game_id, "message": "Nova partida criada com sucesso."}
 
 
 @app.post("/make_move/{game_id}")

@@ -1,10 +1,11 @@
+import os
 from fastapi import FastAPI, WebSocket, WebSocketDisconnect
 from typing import List, Dict, Tuple
 from uuid import uuid4
 import jwt
 import asyncio
 
-SECRET_KEY = "supersecretkey"  # Substitua por uma chave segura
+SECRET_KEY = os.getenv("SECRET_KEY")
 app = FastAPI()
 
 # Fila de jogadores
@@ -24,19 +25,19 @@ async def create_match():
             # Pega os dois primeiros jogadores da fila
             player1_id, ws1 = queue.pop(0)
             player2_id, ws2 = queue.pop(0)
-            room_id = str(uuid4())
+            game_id = str(uuid4())
 
             # Armazena o lobby criado
-            active_lobbies[room_id] = (player1_id, player2_id)
+            active_lobbies[game_id] = (player1_id, player2_id)
 
             # Cria tokens JWT para ambos os jogadores
             token1 = jwt.encode(
-                {"room_id": room_id, "players": [player1_id, player2_id]},
+                {"game_id": game_id, "players": [player1_id, player2_id]},
                 SECRET_KEY,
                 algorithm="HS256",
             )
             token2 = jwt.encode(
-                {"room_id": room_id, "players": [player1_id, player2_id]},
+                {"game_id": game_id, "players": [player1_id, player2_id]},
                 SECRET_KEY,
                 algorithm="HS256",
             )
