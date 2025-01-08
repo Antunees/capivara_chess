@@ -34,7 +34,9 @@ async def main():
     players = [uuid4(), uuid4(), uuid4(), uuid4(), uuid4(), uuid4()]  # IDs dos jogadores
     # tasks = [connect_player(player_id, "a") for player_id in players]
     tasks = [
-        connect_player('54f24c69-8ca6-4c4d-9edb-9abb946ad902', 'abf39507-2d02-4234-be04-6d053415045f'), # cap
+        # connect_player('54f24c69-8ca6-4c4e-9edb-9abb946ad902', 'abf39507-2d02-4234-be04-6d053415045f'), # cap
+        # connect_player('54f24c69-8ca6-4c4d-9edb-9abb946ad902', 'abf39507-2d02-4234-be04-6d053415045f'), # cap WRONG
+        connect_player('775e3aae-c22a-44bd-b439-5819a477dd09', 'f67c6aee-80d5-4c83-b1ee-732c405618ee'), # cap2
         connect_player('775e3aae-c22a-44bd-b439-5819a477dd09', 'f67c6aee-80d5-4c83-b1ee-732c405618ee'), # cap2
     ]
 

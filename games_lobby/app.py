@@ -27,35 +27,39 @@ async def create_match():
     """
     while True:
         if len(queue) >= 2:
-            # Pega os dois primeiros jogadores da fila
             player1_id, ws1 = queue.pop(0)
-            player2_id, ws2 = queue.pop(0)
-            game_id = str(uuid4())
+            has_two_different_players = False
+            for i, (player2_id, ws2) in enumerate(queue):
+                if player1_id != player2_id:
+                    has_two_different_players = True
+                    queue.pop(i)
 
-            # Armazena o lobby criado
-            active_lobbies[game_id] = (player1_id, player2_id)
+                    game_id = str(uuid4())
 
-            # Cria tokens JWT para ambos os jogadores
-            token1 = jwt.encode(
-                {"game_id": game_id, "players": [player1_id, player2_id]},
-                SECRET_KEY,
-                algorithm="HS256",
-            )
-            token2 = jwt.encode(
-                {"game_id": game_id, "players": [player1_id, player2_id]},
-                SECRET_KEY,
-                algorithm="HS256",
-            )
+                    active_lobbies[game_id] = (player1_id, player2_id)
 
-            # Envia o token para ambos os jogadores
-            await ws1.send_json({"token": token1})
-            await ws2.send_json({"token": token2})
+                    token1 = jwt.encode(
+                        {"game_id": game_id, "players": [player1_id, player2_id]},
+                        SECRET_KEY,
+                        algorithm="HS256",
+                    )
+                    token2 = jwt.encode(
+                        {"game_id": game_id, "players": [player1_id, player2_id]},
+                        SECRET_KEY,
+                        algorithm="HS256",
+                    )
 
-            # Fecha as conexões WebSocket
-            await ws1.close()
-            await ws2.close()
+                    await ws1.send_json({"token": token1})
+                    await ws2.send_json({"token": token2})
+
+                    await ws1.close()
+                    await ws2.close()
+
+            if not has_two_different_players:
+                queue.append((player1_id, ws1))
+            await asyncio.sleep(1)
         else:
-            await asyncio.sleep(1)  # Aguarda antes de verificar novamente
+            await asyncio.sleep(1)
 
 
 @app.websocket("/ws/join-lobby/{player_id}/{player_secret}")
