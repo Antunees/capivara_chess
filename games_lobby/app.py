@@ -13,17 +13,15 @@ from broker_db import Broker
 SECRET_KEY = os.getenv("SECRET_KEY")
 app = FastAPI()
 
-# Fila de jogadores
 global queue
 queue: List[Tuple[str, WebSocket]] = []
 
-# Lobbies ativos
 active_lobbies: Dict[str, Tuple[str, str]] = {}
 
 
 async def create_match():
     """
-    Cria uma partida para dois jogadores da fila.
+    Create a match for two differents players on queue
     """
     while True:
         if len(queue) >= 2:
@@ -84,13 +82,11 @@ async def join_lobby(websocket: WebSocket, player_id: str, player_secret: str):
     try:
         await websocket.send_json({"message": "waiting_for_match"})
         while True:
-            await asyncio.sleep(1)  # Mantém a conexão aberta
+            await asyncio.sleep(1)
     except WebSocketDisconnect:
-        # Remove o jogador da fila caso desconecte
         queue = [item for item in queue if item[1] != websocket]
 
 
-# Roda a função de emparelhamento de forma contínua
 @app.on_event("startup")
 async def start_matchmaking():
     asyncio.create_task(create_match())
