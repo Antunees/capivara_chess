@@ -8,6 +8,8 @@ from fastapi.responses import Response
 import cairosvg
 import chess.svg
 from datetime import datetime
+import requests
+import json
 
 SECRET_KEY = os.getenv("SECRET_KEY")
 app = FastAPI()
@@ -25,6 +27,26 @@ class ChessGame:
 
     def switch_player(self):
         self.current_player = "black" if self.current_player == "white" else "white"
+
+    def register_end_of_game(self):
+
+        url = "http://localhost:9001/api/v1/games/"
+
+        payload = json.dumps({
+            "player_white": "3fa85f64-5717-4562-b3fc-2c963f66afa6",
+            "player_black": "3fa85f64-5717-4562-b3fc-2c963f66afa6",
+            "player_winner": "3fa85f64-5717-4562-b3fc-2c963f66afa6",
+            "start_time": "2025-01-08T13:24:50.413Z",
+            "end_time": "2025-01-08T13:24:50.413Z"
+        })
+        headers = {
+            'Content-Type': 'application/json'
+        }
+
+        response = requests.request("POST", url, headers=headers, data=payload)
+
+        print(response.text)
+
 
     def update_time(self):
         now = datetime.now()

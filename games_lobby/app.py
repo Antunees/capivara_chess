@@ -1,9 +1,14 @@
+import json
+import logging
 import os
-from fastapi import FastAPI, WebSocket, WebSocketDisconnect
+from fastapi import FastAPI, WebSocket, WebSocketDisconnect, HTTPException
 from typing import List, Dict, Tuple
 from uuid import uuid4
 import jwt
 import asyncio
+import hashlib
+
+from broker_db import Broker
 
 SECRET_KEY = os.getenv("SECRET_KEY")
 app = FastAPI()
@@ -53,11 +58,22 @@ async def create_match():
             await asyncio.sleep(1)  # Aguarda antes de verificar novamente
 
 
-@app.websocket("/ws/join-lobby/{player_id}")
-async def join_lobby(websocket: WebSocket, player_id: str):
+@app.websocket("/ws/join-lobby/{player_id}/{player_secret}")
+async def join_lobby(websocket: WebSocket, player_id: str, player_secret: str):
     """
     Adiciona um jogador à fila de lobby.
     """
+    md5_hash = f'{player_id}:{player_secret}'.encode('utf-8')
+    md5_hash = hashlib.md5(md5_hash).hexdigest()
+    try:
+        if not Broker.get(f'player_id_secret:{md5_hash}'):
+            logging.warning("Player not found")
+            raise HTTPException(status_code=401, detail="Forbidden")
+    except Exception as e:
+        logging.warning("Exception if not Broker.get(f'player_id_secret:{md5_hash}'):")
+        logging.warning(e)
+        raise HTTPException(status_code=401, detail="Forbidden")
+
     await websocket.accept()
     global queue
     queue.append((player_id, websocket))
