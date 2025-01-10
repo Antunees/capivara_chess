@@ -11,6 +11,7 @@ from datetime import datetime
 import requests
 import json
 import jwt
+from broker_db import Broker
 
 SECRET_KEY = os.getenv("SECRET_KEY")
 app = FastAPI()
@@ -31,7 +32,21 @@ class ChessGame:
     def switch_player(self):
         self.current_player = "black" if self.current_player == "white" else "white"
 
+    def already_registered(self):
+        try:
+            if Broker.get(f'game:{self.game_id}'):
+               return True
+        except Exception as e:
+            logging.warning("ChessGame def already_registered(self):")
+            logging.warning(e)
+            raise HTTPException(status_code=500, detail="Error")
+
+        return False
+
     def register_end_of_game(self, winner, result):
+        if self.already_registered():
+            return
+
         url = "http://games_results:9001/api/v1/games/"
 
         payload = {
