@@ -10,17 +10,20 @@ import chess.svg
 from datetime import datetime
 import requests
 import json
+import jwt
 
 SECRET_KEY = os.getenv("SECRET_KEY")
 app = FastAPI()
 
+
 games = {}
 
 class ChessGame:
-    def __init__(self, white_id: str, black_id: str, initial_time: int = 600, increment: int = 5):
+    def __init__(self, white_id: str, black_id: str, game_id: str, initial_time: int = 600, increment: int = 5):
         self.board = chess.Board()
         self.time_left = {"white": initial_time, "black": initial_time}
         self.player_id = {"white": white_id, "black": black_id}
+        self.game_id = game_id
         self.increment = increment
         self.last_move_time = datetime.now()
         self.current_player = "white" # Starts
@@ -28,24 +31,32 @@ class ChessGame:
     def switch_player(self):
         self.current_player = "black" if self.current_player == "white" else "white"
 
-    def register_end_of_game(self):
+    def register_end_of_game(self, winner, result):
+        url = "http://games_results:9001/api/v1/games/"
 
-        url = "http://localhost:9001/api/v1/games/"
-
-        payload = json.dumps({
-            "player_white": "3fa85f64-5717-4562-b3fc-2c963f66afa6",
-            "player_black": "3fa85f64-5717-4562-b3fc-2c963f66afa6",
-            "player_winner": "3fa85f64-5717-4562-b3fc-2c963f66afa6",
+        payload = {
+            "game_id": self.game_id,
+            "player_white": self.player_id['white'],
+            "player_black": self.player_id['black'],
+            "player_winner": self.player_id[winner] if winner != None else '00000000-0000-0000-0000-000000000000',
             "start_time": "2025-01-08T13:24:50.413Z",
-            "end_time": "2025-01-08T13:24:50.413Z"
-        })
+            "end_time": "2025-01-08T13:24:50.413Z",
+            "result": result
+        }
+
+        token1 = jwt.encode(
+            payload,
+            SECRET_KEY,
+            algorithm="HS256",
+        )
         headers = {
             'Content-Type': 'application/json'
         }
 
-        response = requests.request("POST", url, headers=headers, data=payload)
+        response = requests.request("POST", url, headers=headers, data=json.dumps({'token': token1}))
 
-        print(response.text)
+        if response.status_code != 200:
+            logging.warning(f'Error on save result of game. Status_code {response.status_code}. Response {response.text}. token {token1}')
 
 
     def update_time(self):
@@ -99,8 +110,8 @@ class Move(BaseModel):
     move: str
 
 
-@app.post("/create_game", status_code=201)
-def create_game(token: str, response: Response):
+@app.post("/start_game", status_code=201)
+def start_game(token: str, response: Response):
     """Cria uma nova partida de xadrez."""
     token1 = jwt.decode(
         token,
@@ -109,14 +120,14 @@ def create_game(token: str, response: Response):
     )
 
     if not games.get(token1['game_id']):
-        games[token1['game_id']] = ChessGame(token1['players'][0], token1['players'][1])
-        return
+        games[token1['game_id']] = ChessGame(token1['players'][0], token1['players'][1], token1['game_id'])
+        return {'white': token1['players'][0], 'black': token1['players'][1]}
 
     response.status_code = status.HTTP_200_OK
+    return {'white': token1['players'][0], 'black': token1['players'][1]}
 
-
-# @app.post("/create_game")
-# def create_game(game_id: str, white_id: str, black_id: str):
+# @app.post("/start_game")
+# def start_game(game_id: str, white_id: str, black_id: str):
 #     """Cria uma nova partida de xadrez."""
 #     games[game_id] = ChessGame(white_id, black_id)
 #     return {"game_id": game_id, "message": "Nova partida criada com sucesso."}
@@ -149,6 +160,9 @@ def make_move(game_id: str, move: Move, player_id: str):
     game.update_time()
 
     if game.time_left[game.current_player] <= 0 or game.time_left[game.current_player] == game.increment:
+        status = game.check_game_status()
+        if status['status'] == 'finished':
+            game.register_end_of_game(status['winner'], status['result'])
         return {
             "message": f"Jogador {game.current_player} perdeu por tempo!",
             "board": str(board),
@@ -170,6 +184,11 @@ def make_move(game_id: str, move: Move, player_id: str):
         status = "Empate por repetição de posição."
     else:
         status = "Jogo em andamento."
+
+    if status != 'Jogo em andamento':
+        status = game.check_game_status()
+        if status['status'] == 'finished':
+            game.register_end_of_game(status['winner'], status['result'])
 
     return {
         "message": f"Movimento {move.move} realizado com sucesso.",
@@ -227,6 +246,8 @@ def check_status(game_id: str):
 
     game: ChessGame = games[game_id]
     status = game.check_game_status()
+    if status['status'] == 'finished':
+        game.register_end_of_game(status['winner'], status['result'])
     if "error" in status:
         raise HTTPException(status_code=404, detail=status["error"])
     return status
