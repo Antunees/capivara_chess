@@ -5,3 +5,7 @@ Lib/
 Include/
 Scripts/
 __pycache__
+bin/
+lib/
+lib*
+share/

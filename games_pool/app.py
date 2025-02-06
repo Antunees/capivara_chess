@@ -1,9 +1,11 @@
+import io
 import jwt
 import logging
 import os
 from fastapi import FastAPI, Response, status, HTTPException
 from pydantic import BaseModel
 import chess
+import chess.pgn
 from fastapi.responses import Response
 import cairosvg
 import chess.svg
@@ -22,12 +24,20 @@ games = {}
 class ChessGame:
     def __init__(self, white_id: str, black_id: str, game_id: str, initial_time: int = 600, increment: int = 5):
         self.board = chess.Board()
+        self.pgn_game = chess.pgn.Game()
+        self.pgn_node = self.pgn_game
         self.time_left = {"white": initial_time, "black": initial_time}
         self.player_id = {"white": white_id, "black": black_id}
         self.game_id = game_id
         self.increment = increment
         self.last_move_time = datetime.now()
         self.current_player = "white" # Starts
+        self.pgn_text = ''
+
+        self.pgn_game.headers['Event'] = 'Normal Game'
+        self.pgn_game.headers['White'] = white_id
+        self.pgn_game.headers['Black'] = black_id
+        self.pgn_game.headers['Site'] = 'Capivara Chess'
 
     def switch_player(self):
         self.current_player = "black" if self.current_player == "white" else "white"
@@ -56,7 +66,8 @@ class ChessGame:
             "player_winner": self.player_id[winner] if winner != None else '00000000-0000-0000-0000-000000000000',
             "start_time": "2025-01-08T13:24:50.413Z",
             "end_time": "2025-01-08T13:24:50.413Z",
-            "result": result
+            "result": result,
+            'pgn_text': self.pgn_text
         }
 
         token1 = jwt.encode(
@@ -185,6 +196,11 @@ def make_move(game_id: str, move: Move, player_id: str):
         }
 
     board.push(chess_move)
+    game.pgn_node = game.pgn_node.add_variation(board.peek())
+    exporter = chess.pgn.StringExporter()
+    game.pgn_game.accept(exporter)
+    game.pgn_text = str(exporter)
+
     game.switch_player()
 
     if board.is_checkmate():
@@ -222,7 +238,7 @@ def get_board(game_id: str):
 
     game: ChessGame = games[game_id]
     board = game.board
-    return {"board": str(board)}
+    return {"board": str(board), "pgn": str(game.pgn_text)}
 
 
 @app.get("/get_legal_moves/{game_id}")
