@@ -36,13 +36,17 @@ async def create_match():
 
                     active_lobbies[game_id] = (player1_id, player2_id)
 
+                    pool_address = {
+                        'host': '10.20.1.204',
+                        'port': '9000'
+                    }
                     token1 = jwt.encode(
-                        {"game_id": game_id, "players": [player1_id, player2_id]},
+                        {"game_id": game_id, "players": [player1_id, player2_id], "pool_address": pool_address},
                         SECRET_KEY,
                         algorithm="HS256",
                     )
                     token2 = jwt.encode(
-                        {"game_id": game_id, "players": [player1_id, player2_id]},
+                        {"game_id": game_id, "players": [player1_id, player2_id], "pool_address": pool_address},
                         SECRET_KEY,
                         algorithm="HS256",
                     )
