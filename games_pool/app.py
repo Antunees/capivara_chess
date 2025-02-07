@@ -199,7 +199,6 @@ def make_move(game_id: str, move: Move, player_id: str):
     game.pgn_node = game.pgn_node.add_variation(board.peek())
     exporter = chess.pgn.StringExporter()
     game.pgn_game.accept(exporter)
-    game.pgn_text = str(exporter)
 
     game.switch_player()
 
@@ -219,6 +218,7 @@ def make_move(game_id: str, move: Move, player_id: str):
     if status != 'Jogo em andamento':
         status = game.check_game_status()
         if status['status'] == 'finished':
+            game.pgn_text = str(exporter)
             game.register_end_of_game(status['winner'], status['result'])
 
     return {
