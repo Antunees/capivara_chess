@@ -14,7 +14,7 @@ SECRET_KEY = os.getenv("SECRET_KEY")
 app = FastAPI()
 
 global queue
-queue: List[Tuple[str, WebSocket]] = []
+queue: List[Tuple[str, WebSocket, str]] = []
 
 active_lobbies: Dict[str, Tuple[str, str]] = {}
 
@@ -25,11 +25,11 @@ async def create_match():
     """
     while True:
         if len(queue) >= 2:
-            player1_id, ws1 = queue.pop(0)
-            has_two_different_players = False
-            for i, (player2_id, ws2) in enumerate(queue):
-                if player1_id != player2_id:
-                    has_two_different_players = True
+            player1_id, ws1, mode = queue.pop(0)
+            has_founded_match = False
+            for i, (player2_id, ws2, mode2) in enumerate(queue):
+                if player1_id != player2_id and mode == mode2:
+                    has_founded_match = True
                     queue.pop(i)
 
                     game_id = str(uuid4())
@@ -57,15 +57,15 @@ async def create_match():
                     await ws1.close()
                     await ws2.close()
 
-            if not has_two_different_players:
-                queue.append((player1_id, ws1))
+            if not has_founded_match:
+                queue.append((player1_id, ws1, mode))
             await asyncio.sleep(1)
         else:
             await asyncio.sleep(1)
 
 
-@app.websocket("/ws/join-lobby/{player_id}/{player_secret}")
-async def join_lobby(websocket: WebSocket, player_id: str, player_secret: str):
+@app.websocket("/ws/join-lobby/{player_id}/{player_secret}/{mode}")
+async def join_lobby(websocket: WebSocket, player_id: str, player_secret: str, mode: str):
     """
     Adiciona um jogador à fila de lobby.
     """
@@ -82,7 +82,7 @@ async def join_lobby(websocket: WebSocket, player_id: str, player_secret: str):
 
     await websocket.accept()
     global queue
-    queue.append((player_id, websocket))
+    queue.append((player_id, websocket, mode))
     try:
         await websocket.send_json({"message": "waiting_for_match"})
         while True:
