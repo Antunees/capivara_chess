@@ -58,7 +58,7 @@ class ChessGame:
         if self.already_registered():
             return
 
-        url = "http://games_results:9001/api/v1/games/?secret={MY_SECRET}"
+        url = f"http://games_results:9001/api/v1/games/?secret={MY_SECRET}"
 
         payload = {
             "game_id": self.game_id,

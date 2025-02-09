@@ -25,6 +25,8 @@ async def create_match():
     Create a match for two differents players on queue
     """
     while True:
+        on_queue = len(queue)
+        logging.warning(f'{on_queue} on Queue')
         if len(queue) >= 2:
             player1_id, ws1, mode, timestamp_register = queue.pop(0)
             has_founded_match = False
