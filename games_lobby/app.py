@@ -91,7 +91,7 @@ async def create_match():
                     queue.append((player1_id, ws1, mode, timestamp_register))
                 else:
                     try:
-                        await ws1.send_json({"msg": 'Expired time on queue'})
+                        await ws1.send_json({"message": 'Expired time on queue'})
                         await ws1.close()
                     except Exception as e:
                         logging.warning('start_matchmaking Expired time on queue Error')
