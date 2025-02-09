@@ -16,6 +16,7 @@ import jwt
 from broker_db import Broker
 
 SECRET_KEY = os.getenv("SECRET_KEY")
+MY_SECRET = os.getenv("MY_SECRET")
 app = FastAPI()
 
 
@@ -57,7 +58,7 @@ class ChessGame:
         if self.already_registered():
             return
 
-        url = "http://games_results:9001/api/v1/games/"
+        url = "http://games_results:9001/api/v1/games/?secret={MY_SECRET}"
 
         payload = {
             "game_id": self.game_id,

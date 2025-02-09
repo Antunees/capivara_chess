@@ -7,6 +7,7 @@ from uuid import uuid4
 import jwt
 import asyncio
 import hashlib
+import time
 
 from broker_db import Broker
 
@@ -14,7 +15,7 @@ SECRET_KEY = os.getenv("SECRET_KEY")
 app = FastAPI()
 
 global queue
-queue: List[Tuple[str, WebSocket, str]] = []
+queue: List[Tuple[str, WebSocket, str, float]] = []
 
 active_lobbies: Dict[str, Tuple[str, str]] = {}
 
@@ -25,11 +26,11 @@ async def create_match():
     """
     while True:
         if len(queue) >= 2:
-            player1_id, ws1, mode = queue.pop(0)
+            player1_id, ws1, mode, timestamp_register = queue.pop(0)
             has_founded_match = False
-            for i, (player2_id, ws2, mode2) in enumerate(queue):
+
+            for i, (player2_id, ws2, mode2, timestamp_register2) in enumerate(queue):
                 if player1_id != player2_id and mode == mode2:
-                    has_founded_match = True
                     queue.pop(i)
 
                     game_id = str(uuid4())
@@ -51,14 +52,50 @@ async def create_match():
                         algorithm="HS256",
                     )
 
-                    await ws1.send_json({"token": token1})
-                    await ws2.send_json({"token": token2})
+                    try:
+                        await ws1.send_json({"token": token1})
+                    except Exception as e:
+                        logging.warning('start_matchmaking ws1.send_json Error')
+                        logging.warning(str(e))
+                        queue.append((player2_id, ws2, mode2, timestamp_register2))
+                        continue
+                    try:
+                        await ws2.send_json({"token": token2})
+                    except Exception as e:
+                        logging.warning('start_matchmaking ws2.send_json Error')
+                        logging.warning(str(e))
+                        queue.append((player2_id, ws2, mode2, timestamp_register2))
+                        continue
 
-                    await ws1.close()
-                    await ws2.close()
+                    try:
+                        await ws1.close()
+                    except Exception as e:
+                        logging.warning('start_matchmaking ws1.close Error')
+                        logging.warning(str(e))
+                        queue.append((player2_id, ws2, mode2, timestamp_register2))
+                        continue
+                    try:
+                        await ws2.close()
+                    except Exception as e:
+                        logging.warning('start_matchmaking ws2.close Error')
+                        logging.warning(str(e))
+                        queue.append((player2_id, ws2, mode2, timestamp_register2))
+                        continue
+
+                    has_founded_match = True
 
             if not has_founded_match:
-                queue.append((player1_id, ws1, mode))
+                timestamp_atual = time.time()
+                # If more than 30 seconds on queue, remove
+                if timestamp_atual - timestamp_register <= 60:
+                    queue.append((player1_id, ws1, mode, timestamp_register))
+                else:
+                    try:
+                        await ws1.send_json({"msg": 'Expired time on queue'})
+                        await ws1.close()
+                    except Exception as e:
+                        logging.warning('start_matchmaking Expired time on queue Error')
+                        logging.warning(str(e))
             await asyncio.sleep(1)
         else:
             await asyncio.sleep(1)
@@ -80,9 +117,11 @@ async def join_lobby(websocket: WebSocket, player_id: str, player_secret: str, m
         logging.warning(e)
         raise HTTPException(status_code=401, detail="Forbidden")
 
+    timestamp_register = time.time()
+
     await websocket.accept()
     global queue
-    queue.append((player_id, websocket, mode))
+    queue.append((player_id, websocket, mode, timestamp_register))
     try:
         await websocket.send_json({"message": "waiting_for_match"})
         while True:
@@ -93,4 +132,9 @@ async def join_lobby(websocket: WebSocket, player_id: str, player_secret: str, m
 
 @app.on_event("startup")
 async def start_matchmaking():
-    asyncio.create_task(create_match())
+    try:
+        asyncio.create_task(create_match())
+    except Exception as e:
+        logging.warning('start_matchmaking Error')
+        logging.warning(str(e))
+        exit(1)
