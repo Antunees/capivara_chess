@@ -3,10 +3,10 @@ import json
 import websockets
 import logging
 import time
+import random
 
 import requests
 import jwt
-
 
 
 player_id = '4c88b6a4-44df-4d27-9add-35c3ac0ede86'
@@ -25,7 +25,8 @@ async def request_game(player_id, player_secret):
     Conecta um jogador ao WebSocket e processa as mensagens recebidas.
     """
     try:
-        url = f"ws://10.20.1.204:9002/ws/join-lobby/{player_id}/{player_secret}"
+        mode = 'casual'
+        url = f"ws://10.20.1.204:9002/ws/join-lobby/{player_id}/{player_secret}/{mode}"
         async with websockets.connect(url) as websocket:
             logging.warning(f"Jogador {player_id} conectado ao lobby.")
 
@@ -98,12 +99,14 @@ async def main():
     )
     game_id = token1['game_id']
     logging.warning(f'game_id: {game_id}')
+    logging.warning(f'jwt: {game_token}')
     pool_host = token1['pool_address']['host']
     pool_port = token1['pool_address']['port']
 
     match_info = start_game(pool_host, pool_port, game_token)
     player_color = 'white' if match_info['white'] == player_id else 'black'
 
+    logging.warning(f'match_info: {match_info}')
 
     running = True
 
@@ -118,6 +121,7 @@ async def main():
 
         legal_moves = get_legal_moves(pool_host, pool_port, game_id)['legal_moves']
 
+        random.shuffle(legal_moves)
         if make_move(pool_host, pool_port, game_id, legal_moves[0]):
             logging.warning('move maded')
 

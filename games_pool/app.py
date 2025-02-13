@@ -269,7 +269,6 @@ def get_board_image(game_id: str):
     return Response(content=board_png, media_type="image/png")
 
 
-
 @app.get("/check_status/{game_id}")
 def check_status(game_id: str):
     """Endpoint para verificar o status de uma partida."""
