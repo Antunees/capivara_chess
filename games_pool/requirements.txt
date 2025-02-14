@@ -1,7 +1,7 @@
 fastapi
 uvicorn
 python-chess
-cairosvg
+# cairosvg
 pyjwt
 requests
 redis==5.1.0

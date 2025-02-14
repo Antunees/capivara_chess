@@ -7,7 +7,8 @@ import chess
 import chess.pgn
 from fastapi.responses import Response, HTMLResponse
 from fastapi.templating import Jinja2Templates
-import cairosvg
+# import cairosvg
+from typing import List
 import chess.svg
 from datetime import datetime
 import requests
@@ -24,7 +25,8 @@ templates = Jinja2Templates(directory="templates")
 games = {}
 
 class ChessGame:
-    def __init__(self, white_id: str, black_id: str, game_id: str, host: str, port: str, initial_time: int = 600, increment: int = 5):
+    def __init__(self, id: str, white_id: str, black_id: str, game_id: str, host: str, port: str, initial_time: int = 600, increment: int = 5):
+        self.id = id
         self.host = host
         self.port = port
         self.board = chess.Board()
@@ -37,11 +39,22 @@ class ChessGame:
         self.last_move_time = datetime.now()
         self.current_player = "white" # Starts
         self.pgn_text = ''
+        self.result = ''
+        self.winner = ''
 
         self.pgn_game.headers['Event'] = 'Normal Game'
         self.pgn_game.headers['White'] = white_id
         self.pgn_game.headers['Black'] = black_id
         self.pgn_game.headers['Site'] = 'Capivara Chess'
+
+    def as_dict(self):
+        return {
+            'id': self.id,
+            'time_left': self.time_left,
+            'player_id': self.player_id,
+            'result': self.result,
+            'winner': self.winner,
+        }
 
     def switch_player(self):
         self.current_player = "black" if self.current_player == "white" else "white"
@@ -73,6 +86,9 @@ class ChessGame:
             "result": result,
             'pgn_text': self.pgn_text
         }
+
+        self.result = result
+        self.winner = winner
 
         token1 = jwt.encode(
             payload,
@@ -150,7 +166,7 @@ def start_game(token: str, response: Response):
     )
 
     if not games.get(token1['game_id']):
-        games[token1['game_id']] = ChessGame(token1['players'][0], token1['players'][1], token1['game_id'], token1['pool_address']['host'], token1['pool_address']['port'])
+        games[token1['game_id']] = ChessGame(token1['game_id'], token1['players'][0], token1['players'][1], token1['game_id'], token1['pool_address']['host'], token1['pool_address']['port'])
         return {'white': token1['players'][0], 'black': token1['players'][1]}
 
     response.status_code = status.HTTP_200_OK
@@ -267,9 +283,9 @@ def get_board_image(game_id: str):
     board = game.board
     board_svg = chess.svg.board(board=board)
 
-    board_png = cairosvg.svg2png(bytestring=board_svg)
+    # board_png = cairosvg.svg2png(bytestring=board_svg)
 
-    return Response(content=board_png, media_type="image/png")
+    return Response(content=board_svg, media_type="image/svg+xml")
 
 
 @app.get("/check_status/{game_id}")
