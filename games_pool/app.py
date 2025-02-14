@@ -310,4 +310,27 @@ async def serve_html(request: Request, game_id: str):
     image_url = f"http://{game.host}:{game.port}/board_image/{game_id}"
     return templates.TemplateResponse("game_board.html", {"request": request, "image_url": image_url})
 
+@app.get("/all_boards", response_class=HTMLResponse)
+async def serve_html(request: Request):
+    games_ids = games.keys()
+    # ids = []
+    # for game_id in games_ids:
+    #     if games[game_id].result == '':
+    #         ids.append(game_id)
+    # return templates.TemplateResponse("all_boards.simple.html", {"request": request, "ids": ids})
 
+    games_dict = []
+    for game_id in games_ids:
+        if games[game_id].result == '':
+            games_dict.append(games[game_id].as_dict())
+    return templates.TemplateResponse("all_boards.html", {"request": request, "boards": games_dict})
+
+@app.get("/active_games_ids")
+async def serve_html():
+    games_ids = games.keys()
+    ids: List[str]= []
+
+    for game_id in games_ids:
+        if games[game_id].result == '':
+            ids.append(game_id)
+    return ids
