@@ -5,12 +5,12 @@ from fastapi import FastAPI, Response, status, HTTPException, Request
 from pydantic import BaseModel
 import chess
 import chess.pgn
+from datetime import datetime, timezone
 from fastapi.responses import Response, HTMLResponse
 from fastapi.templating import Jinja2Templates
 # import cairosvg
 from typing import List
 import chess.svg
-from datetime import datetime
 import requests
 import json
 import jwt
@@ -41,6 +41,7 @@ class ChessGame:
         self.pgn_text = ''
         self.result = ''
         self.winner = ''
+        self.start_game = datetime.now(timezone.utc).isoformat(timespec="milliseconds").replace("+00:00", "Z")
 
         self.pgn_game.headers['Event'] = 'Normal Game'
         self.pgn_game.headers['White'] = white_id
@@ -81,8 +82,8 @@ class ChessGame:
             "player_white": self.player_id['white'],
             "player_black": self.player_id['black'],
             "player_winner": self.player_id[winner] if winner != None else '00000000-0000-0000-0000-000000000000',
-            "start_time": "2025-01-08T13:24:50.413Z",
-            "end_time": "2025-01-08T13:24:50.413Z",
+            "start_time": self.start_game,
+            "end_time": datetime.now(timezone.utc).isoformat(timespec="milliseconds").replace("+00:00", "Z"),
             "result": result,
             'pgn_text': self.pgn_text
         }
