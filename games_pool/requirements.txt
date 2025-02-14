@@ -5,3 +5,4 @@ cairosvg
 pyjwt
 requests
 redis==5.1.0
+Jinja2

@@ -1,12 +1,12 @@
-import io
 import jwt
 import logging
 import os
-from fastapi import FastAPI, Response, status, HTTPException
+from fastapi import FastAPI, Response, status, HTTPException, Request
 from pydantic import BaseModel
 import chess
 import chess.pgn
-from fastapi.responses import Response
+from fastapi.responses import Response, HTMLResponse
+from fastapi.templating import Jinja2Templates
 import cairosvg
 import chess.svg
 from datetime import datetime
@@ -19,11 +19,14 @@ SECRET_KEY = os.getenv("SECRET_KEY")
 MY_SECRET = os.getenv("MY_SECRET")
 app = FastAPI()
 
+templates = Jinja2Templates(directory="templates")
 
 games = {}
 
 class ChessGame:
-    def __init__(self, white_id: str, black_id: str, game_id: str, initial_time: int = 600, increment: int = 5):
+    def __init__(self, white_id: str, black_id: str, game_id: str, host: str, port: str, initial_time: int = 600, increment: int = 5):
+        self.host = host
+        self.port = port
         self.board = chess.Board()
         self.pgn_game = chess.pgn.Game()
         self.pgn_node = self.pgn_game
@@ -147,7 +150,7 @@ def start_game(token: str, response: Response):
     )
 
     if not games.get(token1['game_id']):
-        games[token1['game_id']] = ChessGame(token1['players'][0], token1['players'][1], token1['game_id'])
+        games[token1['game_id']] = ChessGame(token1['players'][0], token1['players'][1], token1['game_id'], token1['pool_address']['host'], token1['pool_address']['port'])
         return {'white': token1['players'][0], 'black': token1['players'][1]}
 
     response.status_code = status.HTTP_200_OK
@@ -283,5 +286,12 @@ def check_status(game_id: str):
     if "error" in status:
         raise HTTPException(status_code=404, detail=status["error"])
     return status
+
+
+@app.get("/board_html/{game_id}", response_class=HTMLResponse)
+async def serve_html(request: Request, game_id: str):
+    game: ChessGame = games[game_id]
+    image_url = f"http://{game.host}:{game.port}/board_image/{game_id}"
+    return templates.TemplateResponse("game_board.html", {"request": request, "image_url": image_url})
 
 
