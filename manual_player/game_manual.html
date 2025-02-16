@@ -1,0 +1,114 @@
+<!DOCTYPE html>
+<html lang="pt">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Jogo via WebSocket</title>
+</head>
+<body>
+    <h1>Jogo via WebSocket</h1>
+    <button type="button" onclick="connectToLobby()">Conectar ao Lobby</button>
+    <button type="button" onclick="startGame()">Iniciar Jogo</button>
+    <div id="status"></div>
+    <div id="legal-moves"></div>
+    <script>
+        let playerId = "1ce5613d-f310-4fe6-a900-138537fb6bbe";
+        let playerSecret = "b473bad0-0187-4665-8e2b-06511c75a56c";
+        let gameId = "";
+        let gameToken = "";
+        let ws;
+        let poolHost, poolPort;
+        let playerColor = "";
+
+        async function connectToLobby() {
+            if (ws && ws.readyState !== WebSocket.CLOSED) {
+                console.log("WebSocket já conectado.");
+                return;
+            }
+
+            let url = `ws://192.168.0.127:9002/ws/join-lobby/${playerId}/${playerSecret}/manualxbot`;
+            ws = new WebSocket(url);
+
+            ws.onopen = () => console.log("Conectado ao WebSocket!");
+            ws.onmessage = async (event) => {
+                let data = JSON.parse(event.data);
+                console.log("Recebido:", data);
+
+                if (data.token) {
+                    let decodedToken = JSON.parse(atob(data.token.split('.')[1]));
+                    gameToken = data.token
+                    gameId = decodedToken.game_id;
+                    poolHost = decodedToken.pool_address.host;
+                    poolPort = decodedToken.pool_address.port;
+                    console.log("Game ID:", gameId);
+                    startGame();
+                }
+            };
+            ws.onclose = () => console.log("WebSocket desconectado.");
+            ws.onerror = (err) => console.error("Erro no WebSocket:", err);
+        }
+
+        async function startGame() {
+            let url = `http://${poolHost}:${poolPort}/start_game?token=${gameToken}`;
+            let response = await fetch(url, { method: "POST" });
+            let data = await response.json();
+
+            console.log("Jogo iniciado:", data);
+            playerColor = data.white === playerId ? "white" : "black";
+
+            checkStatus();
+        }
+
+        async function checkStatus() {
+            let url = `http://${poolHost}:${poolPort}/check_status/${gameId}`;
+            let response = await fetch(url);
+            let data = await response.json();
+
+            if (data.status !== "ongoing") {
+                console.log("Jogo finalizado.");
+                return;
+            }
+
+            document.getElementById("status").innerText = `Turno: ${data.turn}`;
+            if (data.turn === playerColor) {
+                getLegalMoves();
+            } else {
+                setTimeout(checkStatus, 1000);
+            }
+        }
+
+        async function getLegalMoves() {
+            let url = `http://${poolHost}:${poolPort}/get_legal_moves/${gameId}`;
+            let response = await fetch(url);
+            let data = await response.json();
+
+            console.log("Movimentos legais:", data.legal_moves);
+            let container = document.getElementById("legal-moves");
+            container.innerHTML = "";
+
+            data.legal_moves.forEach(move => {
+                let btn = document.createElement("button");
+                btn.innerText = move;
+                btn.onclick = () => makeMove(move);
+                container.appendChild(btn);
+            });
+        }
+
+        async function makeMove(move) {
+            let url = `http://${poolHost}:${poolPort}/make_move/${gameId}?player_id=${playerId}`;
+            let response = await fetch(url, {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ move })
+            });
+
+            if (response.ok) {
+                console.log("Movimento feito:", move);
+                checkStatus();
+            } else {
+                console.error("Erro ao fazer movimento.");
+            }
+        }
+    </script>
+</body>
+</html>
