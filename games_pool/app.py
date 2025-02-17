@@ -8,6 +8,7 @@ import chess.pgn
 from datetime import datetime, timezone
 from fastapi.responses import Response, HTMLResponse
 from fastapi.templating import Jinja2Templates
+from fastapi.middleware.cors import CORSMiddleware
 # import cairosvg
 from typing import List
 import chess.svg
@@ -20,12 +21,30 @@ SECRET_KEY = os.getenv("SECRET_KEY")
 MY_SECRET = os.getenv("MY_SECRET")
 app = FastAPI()
 
+origins = [
+    "http://localhost",
+    "http://localhost:3000",
+    "http://192.168.0.127:9000",
+    "*",
+]
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=origins,
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
 templates = Jinja2Templates(directory="templates")
 
 games = {}
 
 class ChessGame:
-    def __init__(self, id: str, white_id: str, black_id: str, game_id: str, host: str, port: str, initial_time: int = 600, increment: int = 5):
+    def __init__(
+        self, id: str, white_id: str, black_id: str, game_id: str, host: str,
+        port: str, initial_time: int = 600, increment: int = 5, fen: bool = False
+    ):
         self.id = id
         self.host = host
         self.port = port
@@ -42,6 +61,7 @@ class ChessGame:
         self.result = ''
         self.winner = ''
         self.start_game = datetime.now(timezone.utc).isoformat(timespec="milliseconds").replace("+00:00", "Z")
+        self.fen = fen
 
         self.pgn_game.headers['Event'] = 'Normal Game'
         self.pgn_game.headers['White'] = white_id
@@ -167,7 +187,10 @@ def start_game(token: str, response: Response):
     )
 
     if not games.get(token1['game_id']):
-        games[token1['game_id']] = ChessGame(token1['game_id'], token1['players'][0], token1['players'][1], token1['game_id'], token1['pool_address']['host'], token1['pool_address']['port'])
+        games[token1['game_id']] = ChessGame(
+            token1['game_id'], token1['players'][0], token1['players'][1], token1['game_id'],
+            token1['pool_address']['host'], token1['pool_address']['port'], fen=token1['config']['fen']
+        )
         return {'white': token1['players'][0], 'black': token1['players'][1]}
 
     response.status_code = status.HTTP_200_OK
@@ -259,7 +282,12 @@ def get_board(game_id: str):
 
     game: ChessGame = games[game_id]
     board = game.board
-    return {"board": str(board), "pgn": str(game.pgn_text)}
+
+    fen = ''
+    if game.fen:
+        fen = game.board.fen()
+
+    return {"board": str(board), "pgn": str(game.pgn_text), "fen": fen}
 
 
 @app.get("/get_legal_moves/{game_id}")

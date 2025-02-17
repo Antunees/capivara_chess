@@ -43,13 +43,22 @@ async def create_match():
                         'host': '10.20.1.204',
                         'port': '9000'
                     }
+                    config = {
+                        'fen': True if 'manual' in mode else False,
+                    }
+
+                    jwt_data = {
+                        "game_id": game_id, "players": [player1_id, player2_id],
+                        "pool_address": pool_address, "config": config
+                    }
+
                     token1 = jwt.encode(
-                        {"game_id": game_id, "players": [player1_id, player2_id], "pool_address": pool_address},
+                        jwt_data,
                         SECRET_KEY,
                         algorithm="HS256",
                     )
                     token2 = jwt.encode(
-                        {"game_id": game_id, "players": [player1_id, player2_id], "pool_address": pool_address},
+                        jwt_data,
                         SECRET_KEY,
                         algorithm="HS256",
                     )

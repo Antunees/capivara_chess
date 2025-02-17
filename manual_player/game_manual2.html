@@ -15,14 +15,145 @@
     <script src="lib/chess.min.js"></script>
 
   </head>
-  <body>
+  <body style="background-color: black;">
+    <button type="button" onclick="connectToLobby()">Conectar ao Lobby</button>
+    <br><br><br>
+    <div id="status"></div>
+    <div id="legal-moves"></div>
+    <br><br><br>
     <div id="myBoard" style="width: 400px"></div>
     <script>
+      var board = null
+      var game = new Chess()
+      var whiteSquareGrey = '#a9a9a9'
+      var blackSquareGrey = '#696969'
 
-var board = null
-var game = new Chess()
-var whiteSquareGrey = '#a9a9a9'
-var blackSquareGrey = '#696969'
+      let playerId = "1ce5613d-f310-4fe6-a900-138537fb6bbe";
+      let playerSecret = "b473bad0-0187-4665-8e2b-06511c75a56c";
+      let gameId = "";
+      let gameToken = "";
+      let ws;
+      let poolHost, poolPort;
+      let playerColor = "";
+      let legalMoves = []
+
+      async function connectToLobby() {
+          if (ws && ws.readyState !== WebSocket.CLOSED) {
+              console.log("WebSocket já conectado.");
+              return;
+          }
+
+          let url = `ws://192.168.0.127:9002/ws/join-lobby/${playerId}/${playerSecret}/manualxbot`;
+          ws = new WebSocket(url);
+
+          ws.onopen = () => console.log("Conectado ao WebSocket!");
+          ws.onmessage = async (event) => {
+              let data = JSON.parse(event.data);
+              console.log("Recebido:", data);
+
+              if (data.token) {
+                  let decodedToken = JSON.parse(atob(data.token.split('.')[1]));
+                  gameToken = data.token
+                  gameId = decodedToken.game_id;
+                  poolHost = decodedToken.pool_address.host;
+                  poolPort = decodedToken.pool_address.port;
+                  console.log("Game ID:", gameId);
+                  startGame();
+              }
+          };
+          ws.onclose = () => console.log("WebSocket desconectado.");
+          ws.onerror = (err) => console.error("Erro no WebSocket:", err);
+      }
+
+      async function startGame() {
+          let url = `http://${poolHost}:${poolPort}/start_game?token=${gameToken}`;
+          let response = await fetch(url, { method: "POST" });
+          let data = await response.json();
+
+          console.log("Jogo iniciado:", data);
+          playerColor = data.white === playerId ? "white" : "black";
+
+          var chessBoardConfig = {
+                orientation: playerColor,
+                draggable: true,
+                position: 'start',
+                onDragStart: onDragStart,
+                onDrop: onDrop,
+                onMouseoutSquare: onMouseoutSquare,
+                onMouseoverSquare: onMouseoverSquare,
+                onSnapEnd: onSnapEnd,
+              }
+          board = Chessboard('myBoard', chessBoardConfig)
+
+          checkStatus();
+      }
+
+      async function checkStatus() {
+          let url = `http://${poolHost}:${poolPort}/check_status/${gameId}`;
+          let response = await fetch(url);
+          let data = await response.json();
+
+          if (data.status !== "ongoing") {
+              console.log("Jogo finalizado.");
+              return;
+          }
+
+          document.getElementById("status").innerText = `Turno: ${data.turn}`;
+          if (data.turn === playerColor) {
+              getBoard();
+              getLegalMoves();
+          } else {
+              setTimeout(checkStatus, 1000);
+          }
+      }
+
+      async function getBoard(){
+          let url = `http://${poolHost}:${poolPort}/get_board/${gameId}`;
+          let response = await fetch(url);
+          let data = await response.json();
+
+          board.position(data.fen)
+          game.load(data.fen)
+      }
+
+      async function getLegalMoves() {
+          let url = `http://${poolHost}:${poolPort}/get_legal_moves/${gameId}`;
+          let response = await fetch(url);
+          let data = await response.json();
+
+          console.log("Movimentos legais:", data.legal_moves);
+          legalMoves = data.legal_moves
+
+          // Todo: Remover
+          let container = document.getElementById("legal-moves");
+          container.innerHTML = "";
+
+          data.legal_moves.forEach(move => {
+              let btn = document.createElement("button");
+              btn.innerText = move;
+              btn.onclick = () => makeMove(move);
+              container.appendChild(btn);
+          });
+      }
+
+      async function makeMove(move) {
+          console.log("makeMove:", move);
+          let url = `http://${poolHost}:${poolPort}/make_move/${gameId}?player_id=${playerId}`;
+          let response = await fetch(url, {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ move })
+          });
+
+          if (response.ok) {
+              console.log("Movimento feito:", move);
+              checkStatus();
+              return true;
+          } else {
+              console.error("Erro ao fazer movimento.", move);
+              return false;
+          }
+      }
 
 function removeGreySquares () {
   $('#myBoard .square-55d63').css('background', '')
@@ -62,6 +193,9 @@ function onDrop (source, target) {
 
   // illegal move
   if (move === null) return 'snapback'
+
+  console.log('onDrop target')
+  console.log(target)
 }
 
 function onMouseoverSquare (square, piece) {
@@ -87,26 +221,48 @@ function onMouseoutSquare (square, piece) {
   removeGreySquares()
 }
 
-function onSnapEnd (data, data2, data3) {
-  console.log('data')
-  console.log(data)
-  console.log('data2')
-  console.log(data2)
-  console.log('data3')
-  console.log(data3)
-  board.position(game.fen())
+async function tryMakeMove(moveMaded) {
+  console.log('tryMakeMove legalMoves')
+  console.log(legalMoves)
+  moveHasBeMaded = false;
+  for (const move of legalMoves) {
+    if (moveHasBeMaded) {
+      return true;
+    }
+
+    if (move == moveMaded) {
+      if (await makeMove(move)) {
+        board.position(game.fen())
+        moveHasBeMaded = true;
+      }
+    }
+  };
+
+  if(!moveHasBeMaded) {
+    for (const move of legalMoves) {
+      if (moveHasBeMaded) {
+        return true;
+      }
+
+      if (move.includes(moveMaded)) {
+        if (await makeMove(move)) {
+          board.position(game.fen())
+          moveHasBeMaded = true;
+        }
+      }
+    };
+  }
 }
 
-var config = {
-  draggable: true,
-  position: 'start',
-  onDragStart: onDragStart,
-  onDrop: onDrop,
-  onMouseoutSquare: onMouseoutSquare,
-  onMouseoverSquare: onMouseoverSquare,
-  onSnapEnd: onSnapEnd
+function onSnapEnd (data, moveMaded, data3) {
+  console.log('data')
+  console.log(data)
+  console.log('moveMaded')
+  console.log(moveMaded)
+  console.log('data3')
+  console.log(data3)
+  tryMakeMove(moveMaded);
 }
-board = Chessboard('myBoard', config)
     </script>
   </body>
 </html>
